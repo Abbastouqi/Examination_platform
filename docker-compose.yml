@@ -1,0 +1,92 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      # Host ports remapped to avoid clashing with other local Qdrant projects
+      # (e.g. medical_qdrant on 6333). App talks to it via the internal network.
+      - "6433:6333"
+      - "6434:6334"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    image: examination_platform-backend:latest
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      mongo:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+      - uploads_data:/data/uploads
+      - models_cache:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    # No --reload: the file watcher was aborting the long embedding-model download
+    # and orphaning the host port-forward. Restart manually after backend code edits.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  worker:
+    image: examination_platform-backend:latest   # reuse the backend image (identical deps/code)
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - backend
+      - redis
+    volumes:
+      - ./backend:/app
+      - uploads_data:/data/uploads
+      - models_cache:/root/.cache/huggingface
+    command: celery -A app.workers.celery_app.celery worker --loglevel=info
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true        # reliable file-watching on Windows/WSL bind mounts
+    volumes:
+      - ./frontend:/app               # bind-mount source so edits hot-reload
+      - /app/node_modules             # keep the image's installed deps
+      - /app/.next                    # keep the build cache out of the host mount
+    ports:
+      - "3000:3000"
+    # -H 0.0.0.0 so the dev server is reachable from the host (not just container localhost)
+    command: npm run dev -- -H 0.0.0.0
+
+volumes:
+  mongo_data:
+  qdrant_data:
+  redis_data:
+  uploads_data:
+  models_cache:

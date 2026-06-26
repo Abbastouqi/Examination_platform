@@ -1,0 +1,366 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Light (default) + dark theme surface colors. The `.dark` class is toggled
+   on <html> by the ThemeProvider. */
+body {
+  background-color: #faf7f3; /* warm cream */
+  color: rgb(15 23 42); /* slate-900 */
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+html.dark body {
+  background-color: #0b1020; /* ink-950 */
+  color: rgb(226 232 240); /* slate-200 */
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* thin scrollbar */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgb(203 213 225);
+  border-radius: 9999px;
+}
+html.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgb(51 65 85);
+}
+
+/* markdown prose for chat */
+.prose-chat {
+  line-height: 1.6;
+  word-break: break-word;
+}
+.prose-chat p {
+  margin: 0 0 0.75rem 0;
+}
+.prose-chat p:last-child {
+  margin-bottom: 0;
+}
+.prose-chat ul,
+.prose-chat ol {
+  margin: 0.5rem 0 0.75rem 1.25rem;
+  list-style: revert;
+}
+.prose-chat li {
+  margin: 0.2rem 0;
+}
+.prose-chat code {
+  background: rgb(241 245 249);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.35rem;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+html.dark .prose-chat code {
+  background: rgb(30 41 59);
+  color: rgb(226 232 240);
+}
+html.dark .prose-chat a {
+  color: rgb(165 180 252);
+}
+html.dark .prose-chat th,
+html.dark .prose-chat td {
+  border-color: rgb(51 65 85);
+}
+.prose-chat pre {
+  background: rgb(15 23 42);
+  color: rgb(226 232 240);
+  padding: 0.9rem 1rem;
+  border-radius: 0.6rem;
+  overflow-x: auto;
+  margin: 0.5rem 0 0.85rem 0;
+}
+.prose-chat pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.prose-chat h1,
+.prose-chat h2,
+.prose-chat h3 {
+  font-weight: 600;
+  margin: 1rem 0 0.5rem 0;
+}
+.prose-chat a {
+  color: rgb(79 70 229);
+  text-decoration: underline;
+}
+.prose-chat table {
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+.prose-chat th,
+.prose-chat td {
+  border: 1px solid rgb(226 232 240);
+  padding: 0.35rem 0.6rem;
+}
+
+/* ===========================================================================
+   Auth pages — self-contained AI/tech themed background
+   (pure CSS gradients + inline SVG data URI; no remote assets)
+   =========================================================================== */
+@layer components {
+  /* Fixed full-viewport backdrop, sits behind the centered auth card. */
+  .auth-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background-color: #0b1027; /* deep navy fallback */
+    pointer-events: none;
+  }
+
+  /* Layer 1 — deep indigo gradient mesh w/ emerald accent glow. */
+  .auth-bg-mesh {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(
+        60rem 60rem at 18% 12%,
+        rgba(99, 102, 241, 0.55) 0%,
+        rgba(99, 102, 241, 0) 60%
+      ),
+      radial-gradient(
+        50rem 50rem at 88% 22%,
+        rgba(16, 185, 129, 0.28) 0%,
+        rgba(16, 185, 129, 0) 58%
+      ),
+      radial-gradient(
+        65rem 65rem at 78% 96%,
+        rgba(79, 70, 229, 0.5) 0%,
+        rgba(79, 70, 229, 0) 60%
+      ),
+      linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #0b1027 100%);
+  }
+
+  /* Layer 2 — faint neural-network / constellation texture (tiled SVG). */
+  .auth-bg-grid {
+    position: absolute;
+    inset: -2px;
+    opacity: 0.5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320' viewBox='0 0 320 320'%3E%3Cg fill='none' stroke='%23a5b4fc' stroke-width='1' stroke-opacity='0.5'%3E%3Cpath d='M40 60 L150 30 L250 90 L40 60 Z'/%3E%3Cpath d='M150 30 L210 170 L250 90'/%3E%3Cpath d='M40 60 L90 200 L210 170'/%3E%3Cpath d='M90 200 L60 290 L200 280 L210 170'/%3E%3Cpath d='M250 90 L300 210 L200 280'/%3E%3Cpath d='M300 210 L210 170'/%3E%3C/g%3E%3Cg fill='%236ee7b7' fill-opacity='0.55'%3E%3Ccircle cx='150' cy='30' r='3'/%3E%3Ccircle cx='250' cy='90' r='2.4'/%3E%3Ccircle cx='300' cy='210' r='2.6'/%3E%3C/g%3E%3Cg fill='%23c7d2fe' fill-opacity='0.7'%3E%3Ccircle cx='40' cy='60' r='3'/%3E%3Ccircle cx='210' cy='170' r='3.4'/%3E%3Ccircle cx='90' cy='200' r='2.6'/%3E%3Ccircle cx='60' cy='290' r='2.4'/%3E%3Ccircle cx='200' cy='280' r='3'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 320px 320px;
+  }
+
+  /* Layer 3 — soft blurred glowing orbs for depth. */
+  .auth-bg-orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(70px);
+    opacity: 0.55;
+  }
+  .auth-bg-orb--brand {
+    top: -8rem;
+    left: -6rem;
+    height: 26rem;
+    width: 26rem;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.9), transparent 70%);
+  }
+  .auth-bg-orb--accent {
+    bottom: -10rem;
+    right: -6rem;
+    height: 24rem;
+    width: 24rem;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.7), transparent 70%);
+  }
+
+  /* Layer 4 — vignette to keep the card crisp against the texture. */
+  .auth-bg-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      75rem 55rem at 50% 50%,
+      rgba(11, 16, 39, 0) 0%,
+      rgba(11, 16, 39, 0.35) 70%,
+      rgba(11, 16, 39, 0.6) 100%
+    );
+  }
+
+  /* Frosted auth card — readable form over the busy backdrop. */
+  .auth-card {
+    background-color: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow:
+      0 20px 45px -15px rgba(8, 11, 30, 0.6),
+      0 6px 14px -6px rgba(8, 11, 30, 0.35);
+  }
+}
+
+/* ===========================================================================
+   Reusable decorative utilities (used across landing / dashboards)
+   =========================================================================== */
+@layer components {
+  /* Indigo→emerald gradient text for headings/brand accents. */
+  .text-gradient {
+    background-image: linear-gradient(120deg, #6366f1 0%, #818cf8 40%, #10b981 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Subtle dotted grid background (light) — for hero/section backdrops. */
+  .bg-grid {
+    background-image: radial-gradient(rgb(99 102 241 / 0.10) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  html.dark .bg-grid {
+    background-image: radial-gradient(rgb(129 140 248 / 0.12) 1px, transparent 1px);
+  }
+
+  /* Frosted glass surface that works in light + dark. */
+  .glass {
+    background-color: rgb(255 255 255 / 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  html.dark .glass {
+    background-color: rgb(17 23 38 / 0.6);
+  }
+
+  /* Soft blurred decorative orb. */
+  .orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(64px);
+    pointer-events: none;
+  }
+
+  /* --- Playful "scholar" theme helpers ----------------------------------- */
+  /* Friendly editorial display heading. */
+  .font-display {
+    font-family: ui-rounded, "Nunito", "Quicksand", "Segoe UI", system-ui,
+      sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* Hand-drawn squiggle underline accent (place after a heading word). */
+  .squiggle {
+    display: inline-block;
+    width: 2.6em;
+    height: 0.5em;
+    vertical-align: middle;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='14' viewBox='0 0 60 14'%3E%3Cpath d='M2 8 C 10 1, 16 13, 24 7 S 40 1, 48 8 S 58 12, 58 6' fill='none' stroke='%23f97316' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+
+  /* Soft pastel doodle backdrop (subtle blobs) for cream sections. */
+  .doodle-bg {
+    background-color: #faf7f3;
+    background-image: radial-gradient(
+        40rem 40rem at 110% -10%,
+        rgba(124, 108, 240, 0.10),
+        transparent 60%
+      ),
+      radial-gradient(
+        34rem 34rem at -10% 110%,
+        rgba(16, 185, 129, 0.10),
+        transparent 60%
+      ),
+      radial-gradient(
+        26rem 26rem at 90% 110%,
+        rgba(245, 158, 11, 0.08),
+        transparent 60%
+      );
+  }
+  html.dark .doodle-bg {
+    background-color: #0b1020;
+    background-image: radial-gradient(
+        40rem 40rem at 110% -10%,
+        rgba(124, 108, 240, 0.18),
+        transparent 60%
+      ),
+      radial-gradient(
+        34rem 34rem at -10% 110%,
+        rgba(16, 185, 129, 0.14),
+        transparent 60%
+      );
+  }
+
+  /* Soft, lifted "playful" card shadow. */
+  .shadow-soft {
+    box-shadow: 0 10px 30px -12px rgba(80, 70, 160, 0.25);
+  }
+
+  /* Card shimmer placeholder while loading. */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.35),
+      transparent
+    );
+    animation: shimmer 1.5s infinite;
+  }
+  html.dark .shimmer::after {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.06),
+      transparent
+    );
+  }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}
+
+/* Very subtle orb drift; disabled for reduced-motion users. */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-bg-orb--brand {
+    animation: auth-orb-drift-a 18s ease-in-out infinite alternate;
+  }
+  .auth-bg-orb--accent {
+    animation: auth-orb-drift-b 22s ease-in-out infinite alternate;
+  }
+  @keyframes auth-orb-drift-a {
+    from {
+      transform: translate(0, 0);
+    }
+    to {
+      transform: translate(2.5rem, 1.5rem);
+    }
+  }
+  @keyframes auth-orb-drift-b {
+    from {
+      transform: translate(0, 0);
+    }
+    to {
+      transform: translate(-2rem, -1.5rem);
+    }
+  }
+}

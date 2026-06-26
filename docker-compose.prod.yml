@@ -1,0 +1,44 @@
+# Production overrides. Run with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Differences from dev: no source bind-mounts, Gunicorn workers, built frontend,
+# multiple Celery workers, an Nginx TLS reverse proxy in front.
+services:
+  backend:
+    volumes:
+      - uploads_data:/data/uploads
+      - models_cache:/root/.cache/huggingface
+    command: gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000 --timeout 180
+    ports: []          # exposed only through nginx
+    environment:
+      - ENVIRONMENT=production
+
+  worker:
+    volumes:
+      - uploads_data:/data/uploads
+      - models_cache:/root/.cache/huggingface
+    command: celery -A app.workers.celery_app.celery worker --loglevel=info --concurrency=4
+
+  frontend:
+    build: ./frontend
+    command: sh -c "npm run build && npm run start"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://api.your-domain.pk
+    ports: []
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+
+volumes:
+  uploads_data:
+  models_cache:
