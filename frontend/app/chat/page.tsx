@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Plus,
   Send,
@@ -19,9 +20,13 @@ import {
   Lightbulb,
   Database,
   X,
+  Square,
+  RefreshCw,
+  Copy,
+  Check,
 } from "lucide-react";
 import AppShell, { PageHeader } from "@/components/AppShell";
-import { api, ApiError, streamChat } from "@/lib/api";
+import { api, ApiError, streamSSE } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type {
   Conversation,
@@ -114,6 +119,8 @@ export default function ChatPage() {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   const loadConversations = async () => {
     try {
@@ -233,19 +240,23 @@ export default function ChatPage() {
     ]);
 
     setStreaming(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
     let createdId: string | undefined;
     try {
-      for await (const delta of streamChat(
-        {
-          chat_id: currentId ?? undefined,
-          message: text,
-          use_rag: useRag,
-        },
-        (info) => {
+      const gen = streamSSE(
+        "/chat/message",
+        { chat_id: currentId ?? undefined, message: text, use_rag: useRag },
+        { signal: controller.signal }
+      );
+      while (true) {
+        const { value, done } = await gen.next();
+        if (done) {
+          const info = value as { chat_id?: string } | undefined;
           if (info?.chat_id) createdId = info.chat_id;
+          break;
         }
-      )) {
-        appendToLastAssistant(delta);
+        appendToLastAssistant(value);
       }
       // if this was a new conversation, adopt the returned id + refresh list
       if (!currentId && createdId) {
@@ -253,24 +264,65 @@ export default function ChatPage() {
         await loadConversations();
       }
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Something went wrong while sending.";
-      setError(msg);
-      // surface the failure inside the assistant bubble if still empty
-      setMessages((prev) => {
-        const next = [...prev];
-        const last = next[next.length - 1];
-        if (last && last.role === "assistant" && !last.content) {
-          next[next.length - 1] = { ...last, content: `⚠️ ${msg}` };
-        }
-        return next;
-      });
+      // A user-initiated Stop aborts the fetch — keep the partial text, no error.
+      const aborted =
+        (e instanceof DOMException && e.name === "AbortError") ||
+        (e as Error)?.name === "AbortError";
+      if (!aborted) {
+        const msg =
+          e instanceof ApiError ? e.message : "Something went wrong while sending.";
+        setError(msg);
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === "assistant" && !last.content) {
+            next[next.length - 1] = { ...last, content: `⚠️ ${msg}` };
+          }
+          return next;
+        });
+      }
     } finally {
       setStreaming(false);
+      abortRef.current = null;
     }
   };
 
   const handleSend = () => sendMessage(input);
+
+  const stopGenerating = () => abortRef.current?.abort();
+
+  // Regenerate: drop the last assistant reply and re-send the last user message.
+  const regenerate = () => {
+    if (streaming) return;
+    let lastUser: string | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        lastUser = messages[i].content;
+        break;
+      }
+    }
+    if (!lastUser) return;
+    // Remove trailing assistant message(s) so sendMessage appends a fresh one.
+    setMessages((prev) => {
+      const next = [...prev];
+      while (next.length && next[next.length - 1].role === "assistant") next.pop();
+      // also drop the last user message; sendMessage re-adds it
+      if (next.length && next[next.length - 1].role === "user") next.pop();
+      return next;
+    });
+    // defer so state settles before re-sending
+    requestAnimationFrame(() => sendMessage(lastUser as string));
+  };
+
+  const copyMessage = async (content: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIdx(idx);
+      setTimeout(() => setCopiedIdx((c) => (c === idx ? null : c)), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
 
   // Prefill the composer with a template and focus it.
   const fillComposer = (text: string) => {
@@ -481,9 +533,38 @@ export default function ChatPage() {
                         {isUser ? (
                           <span className="whitespace-pre-wrap">{m.content}</span>
                         ) : m.content ? (
-                          <div className="prose-chat">
-                            <ReactMarkdown>{m.content}</ReactMarkdown>
-                          </div>
+                          <>
+                            <div className="prose-chat">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {m.content}
+                              </ReactMarkdown>
+                            </div>
+                            {!(streaming && i === messages.length - 1) && (
+                              <div className="mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 dark:border-ink-800">
+                                <button
+                                  onClick={() => copyMessage(m.content, i)}
+                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-ink-800 dark:hover:text-slate-200"
+                                  title="Copy response"
+                                >
+                                  {copiedIdx === i ? (
+                                    <Check className="h-3.5 w-3.5 text-accent-600" />
+                                  ) : (
+                                    <Copy className="h-3.5 w-3.5" />
+                                  )}
+                                  {copiedIdx === i ? "Copied" : "Copy"}
+                                </button>
+                                {i === messages.length - 1 && (
+                                  <button
+                                    onClick={regenerate}
+                                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-ink-800 dark:hover:text-slate-200"
+                                    title="Regenerate response"
+                                  >
+                                    <RefreshCw className="h-3.5 w-3.5" /> Regenerate
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
                         ) : isStreamingBubble ? (
                           <TypingIndicator />
                         ) : (
@@ -540,15 +621,26 @@ export default function ChatPage() {
                   placeholder="Ask your AI tutor anything…"
                   className="max-h-[200px] min-h-[40px] w-full resize-none bg-transparent px-2 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none disabled:opacity-60 dark:text-slate-100 dark:placeholder-slate-500"
                 />
-                <Button
-                  onClick={handleSend}
-                  loading={streaming}
-                  disabled={!input.trim() || streaming}
-                  className="h-10 w-10 shrink-0 rounded-xl !p-0"
-                  aria-label="Send message"
-                >
-                  {!streaming && <Send className="h-4 w-4" />}
-                </Button>
+                {streaming ? (
+                  <Button
+                    onClick={stopGenerating}
+                    variant="danger"
+                    className="h-10 shrink-0 rounded-xl px-3"
+                    aria-label="Stop generating"
+                    title="Stop generating"
+                  >
+                    <Square className="h-3.5 w-3.5 fill-current" /> Stop
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSend}
+                    disabled={!input.trim()}
+                    className="h-10 w-10 shrink-0 rounded-xl !p-0"
+                    aria-label="Send message"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
 
               <div className="mt-2 flex items-center justify-between gap-2">

@@ -17,6 +17,8 @@ import {
   Menu,
   LogOut,
   GraduationCap,
+  PenLine,
+  History,
 } from "lucide-react";
 import { useAuth, RequireAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -34,7 +36,9 @@ const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Main" },
   { href: "/chat", label: "AI Tutor", icon: MessageSquare, group: "Main" },
   { href: "/tests", label: "Mock Tests", icon: FileText, group: "Main" },
+  { href: "/css", label: "CSS Prep", icon: PenLine, group: "Main" },
   { href: "/mcq", label: "MCQ Generator", icon: Sparkles, group: "Main" },
+  { href: "/history", label: "History", icon: History, group: "Main" },
   { href: "/analytics", label: "Analytics", icon: BarChart3, group: "Main" },
   { href: "/billing", label: "Billing", icon: CreditCard, group: "Account" },
   { href: "/api-keys", label: "API Keys", icon: KeyRound, group: "Account" },

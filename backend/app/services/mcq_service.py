@@ -84,6 +84,12 @@ async def generate_mcqs(
         )
         try:
             raw = await qwen_client.chat_json(messages)
+        except qwen_client.LLMUnavailable:
+            # AI backend is down — surface a clean 503 rather than 0 questions,
+            # unless we already gathered some (then return what we have).
+            if collected:
+                break
+            raise
         except Exception as exc:
             logger.warning(f"MCQ generation batch failed (attempt {attempts}): {exc}")
             continue

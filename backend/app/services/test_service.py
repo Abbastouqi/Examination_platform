@@ -291,7 +291,15 @@ async def submit_attempt(user_id: str, attempt_id: str, answers: dict) -> dict:
         else:
             wrong += 1
 
-    score = round((correct / total) * 100, 2) if total else 0.0
+    # Optional negative marking (FPSC/NTS-style): deduct per wrong answer.
+    neg_on = bool(test.get("negative_marking"))
+    penalty = float(test.get("negative_mark", 0.25)) if neg_on else 0.0
+    raw_marks = round(correct - wrong * penalty, 2)
+    if neg_on:
+        score = round(max(0.0, raw_marks / total * 100), 2) if total else 0.0
+    else:
+        score = round((correct / total) * 100, 2) if total else 0.0
+
     now = utcnow()
     started = attempt.get("started_at")
     time_taken = int((now - started).total_seconds()) if started else None
@@ -307,6 +315,8 @@ async def submit_attempt(user_id: str, attempt_id: str, answers: dict) -> dict:
         "wrong": wrong,
         "skipped": skipped,
         "per_topic": per_topic,
+        "negative_marking": neg_on,
+        "raw_marks": raw_marks,
     }
     await get_db().attempts.update_one({"_id": attempt["_id"]}, {"$set": update})
 
@@ -321,6 +331,8 @@ async def submit_attempt(user_id: str, attempt_id: str, answers: dict) -> dict:
         "skipped": skipped,
         "time_taken_seconds": time_taken,
         "per_topic": per_topic,
+        "negative_marking": neg_on,
+        "raw_marks": raw_marks,
     }
 
 
@@ -386,3 +398,113 @@ async def list_tests(user_id: str) -> list[dict]:
 async def get_test(user_id: str, test_id: str) -> dict:
     test = await _owned_test(user_id, test_id)
     return serialize(test)
+
+
+# --- Category-wise FPSC/NTS mock tests (from the curated bank) --------------
+async def list_categories(test_type: str | None = None) -> list[dict]:
+    """Distinct question categories in the bank with counts (for the mock builder)."""
+    db = get_db()
+    match: dict[str, Any] = {"source": "bank"}
+    if test_type:
+        match["test_types"] = test_type
+    cursor = db.mcqs.aggregate(
+        [
+            {"$match": match},
+            {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+            {"$sort": {"_id": 1}},
+        ]
+    )
+    return [{"category": d["_id"], "count": d["count"]} async for d in cursor if d["_id"]]
+
+
+async def create_category_test(
+    *,
+    user_id: str,
+    test_type: str,
+    categories: list[str],
+    num_questions: int,
+    duration_minutes: int,
+    negative_marking: bool = False,
+    negative_mark: float = 0.25,
+) -> dict:
+    """Build a realistic mock test by sampling the bank across the chosen
+    categories (evenly), recording sections per category."""
+    db = get_db()
+    cats = categories or [c["category"] for c in await list_categories(test_type)]
+    if not cats:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No question categories available. Seed the bank first.")
+
+    per = max(1, num_questions // len(cats))
+    mcq_ids: list[Any] = []
+    sections: list[dict] = []
+    for idx, cat in enumerate(cats):
+        remaining = num_questions - len(mcq_ids)
+        want = remaining if idx == len(cats) - 1 else min(per, remaining)
+        if want <= 0:
+            break
+        query: dict[str, Any] = {"source": "bank", "category": cat}
+        if test_type:
+            query["test_types"] = test_type
+        # Random sample so repeat attempts vary.
+        pipeline = [{"$match": query}, {"$sample": {"size": want}}, {"$project": {"_id": 1}}]
+        ids = [d["_id"] async for d in db.mcqs.aggregate(pipeline)]
+        if ids:
+            sections.append({"name": cat, "mcq_ids": ids})
+            mcq_ids.extend(ids)
+
+    if not mcq_ids:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No questions found for the selected categories.")
+
+    title = f"{test_type} Mock Test"
+    doc = {
+        "user_id": user_id,
+        "title": title,
+        "test_type": test_type,
+        "mode": TestMode.FULL.value,
+        "subject_ids": [],
+        "topic_ids": [],
+        "categories": cats,
+        "difficulty": "mixed",
+        "num_questions": len(mcq_ids),
+        "duration_minutes": duration_minutes,
+        "negative_marking": negative_marking,
+        "negative_mark": negative_mark,
+        "mcq_ids": mcq_ids,
+        "sections": sections,
+        "created_at": utcnow(),
+    }
+    result = await db.tests.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return serialize(doc)
+
+
+async def list_attempts(user_id: str, limit: int = 50) -> list[dict]:
+    """Previous attempt history (submitted first), enriched with test titles."""
+    db = get_db()
+    cursor = db.attempts.find({"user_id": user_id}).sort("created_at", -1).limit(limit)
+    attempts = [doc async for doc in cursor]
+    test_ids = list({a["test_id"] for a in attempts if a.get("test_id")})
+    titles: dict[Any, dict] = {}
+    if test_ids:
+        tcur = db.tests.find({"_id": {"$in": test_ids}}, {"title": 1, "test_type": 1})
+        titles = {t["_id"]: t async for t in tcur}
+    out = []
+    for a in attempts:
+        t = titles.get(a.get("test_id"), {})
+        out.append(
+            {
+                "id": str(a["_id"]),
+                "test_id": str(a["test_id"]),
+                "test_title": t.get("title", "Mock Test"),
+                "test_type": t.get("test_type"),
+                "status": a.get("status"),
+                "score": a.get("score"),
+                "total": a.get("total"),
+                "correct": a.get("correct"),
+                "wrong": a.get("wrong"),
+                "skipped": a.get("skipped"),
+                "time_taken_seconds": a.get("time_taken_seconds"),
+                "created_at": a.get("created_at"),
+            }
+        )
+    return out

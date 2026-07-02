@@ -364,6 +364,12 @@ export default function LandingPage() {
                   </Button>
                 </Link>
               ))}
+              <Link href="/trial">
+                <Button size="lg" variant="ghost" className="rounded-full">
+                  Try 4 free questions
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
             </div>
 
             {/* trust stats */}

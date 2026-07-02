@@ -13,6 +13,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.config import settings
 from app.core.logging import write_system_log
+from app.core.ratelimit import rate_limit
 from app.core.security import (
     create_access_token,
     create_purpose_token,
@@ -62,7 +63,12 @@ def _issue_tokens(user: dict) -> LoginResponse:
 
 
 # --- Signup / Login --------------------------------------------------------
-@router.post("/signup", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/signup",
+    response_model=LoginResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit("signup", 10, 3600))],
+)
 async def signup(payload: SignupRequest) -> LoginResponse:
     db = get_db()
     email = payload.email.lower()
@@ -94,7 +100,11 @@ async def signup(payload: SignupRequest) -> LoginResponse:
     return _issue_tokens(doc)
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    dependencies=[Depends(rate_limit("login", 15, 300))],
+)
 async def login(form: OAuth2PasswordRequestForm = Depends()) -> LoginResponse:
     db = get_db()
     email = form.username.lower()
@@ -249,7 +259,7 @@ async def verify_email(payload: VerifyEmailRequest) -> dict:
 
 
 # --- Password reset --------------------------------------------------------
-@router.post("/forgot-password")
+@router.post("/forgot-password", dependencies=[Depends(rate_limit("forgot", 6, 3600))])
 async def forgot_password(payload: ForgotPasswordRequest) -> dict:
     db = get_db()
     email = payload.email.lower()

@@ -8,12 +8,14 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_api_key_owner
+from app.core.ratelimit import rate_limit
 from app.db.mongo import get_db
 from app.schemas.content import PublicAskRequest, PublicExplainRequest, PublicMCQRequest
 from app.services import mcq_service, prompts, qwen_client
 from app.services.rag import retrieve_context
 
-router = APIRouter()
+# Per-IP burst protection on top of per-key metering in get_api_key_owner.
+router = APIRouter(dependencies=[Depends(rate_limit("public_api", 60, 60))])
 
 
 async def _require_scope(user: dict, scope: str) -> None:

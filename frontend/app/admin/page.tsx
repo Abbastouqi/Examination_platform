@@ -18,17 +18,6 @@ import {
   CreditCard,
   Wallet,
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
 import AppShell, { PageHeader } from "@/components/AppShell";
 import { RequireAdmin } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
@@ -40,6 +29,11 @@ import {
   ErrorAlert,
   EmptyState,
 } from "@/components/ui";
+import {
+  UsersTrendChart,
+  RevenueByPlanChart,
+  RevenueTrendChart,
+} from "./_charts";
 
 export default function AdminDashboardPage() {
   const [overview, setOverview] = useState<any>(null);
@@ -230,25 +224,7 @@ export default function AdminDashboardPage() {
                       description="New user sign-up trend will appear here."
                     />
                   ) : (
-                    <ResponsiveContainer width="100%" height={280}>
-                      <LineChart data={usersTrend}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey="date" fontSize={12} stroke="#94a3b8" />
-                        <YAxis
-                          allowDecimals={false}
-                          fontSize={12}
-                          stroke="#94a3b8"
-                        />
-                        <Tooltip />
-                        <Line
-                          type="monotone"
-                          dataKey="count"
-                          stroke="#4f46e5"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <UsersTrendChart data={usersTrend} />
                   )}
                 </CardBody>
               </Card>
@@ -266,19 +242,7 @@ export default function AdminDashboardPage() {
                       description="Revenue by plan will appear here."
                     />
                   ) : (
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={byPlan}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey="plan" fontSize={12} stroke="#94a3b8" />
-                        <YAxis fontSize={12} stroke="#94a3b8" />
-                        <Tooltip />
-                        <Bar
-                          dataKey="revenue"
-                          fill="#10b981"
-                          radius={[4, 4, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <RevenueByPlanChart data={byPlan} />
                   )}
                 </CardBody>
               </Card>
@@ -292,21 +256,7 @@ export default function AdminDashboardPage() {
                   subtitle="Revenue over time"
                 />
                 <CardBody>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={revenueTrend}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" fontSize={12} stroke="#94a3b8" />
-                      <YAxis fontSize={12} stroke="#94a3b8" />
-                      <Tooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <RevenueTrendChart data={revenueTrend} />
                 </CardBody>
               </Card>
             )}

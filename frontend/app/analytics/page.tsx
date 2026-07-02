@@ -11,17 +11,6 @@ import {
   Crosshair,
   ListChecks,
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
 import { api, ApiError } from "@/lib/api";
 import type {
   AnalyticsOverview,
@@ -43,15 +32,7 @@ import {
   EmptyState,
   ErrorAlert,
 } from "@/components/ui";
-
-// Tooltip styling that reads on both light and dark themes.
-const chartTooltipStyle = {
-  borderRadius: 12,
-  border: "1px solid rgba(148,163,184,0.3)",
-  background: "rgba(15,23,42,0.92)",
-  color: "#f1f5f9",
-  fontSize: 12,
-};
+import { ScoreTrendChart, PerSubjectChart } from "./_charts";
 
 function accuracyColor(acc: number): "red" | "amber" | "green" {
   if (acc < 50) return "red";
@@ -228,36 +209,7 @@ export default function AnalyticsPage() {
                 description="Take a few tests to see your score trend."
               />
             ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart
-                  data={scoreTrend}
-                  margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#94a3b8"
-                    strokeOpacity={0.25}
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 12, fill: "#94a3b8" }}
-                    stroke="#94a3b8"
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: "#94a3b8" }}
-                    stroke="#94a3b8"
-                  />
-                  <Tooltip contentStyle={chartTooltipStyle} cursor={{ stroke: "#94a3b8", strokeOpacity: 0.3 }} />
-                  <Line
-                    type="monotone"
-                    dataKey="score"
-                    stroke="#6366f1"
-                    strokeWidth={2.5}
-                    dot={{ r: 3, fill: "#6366f1" }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <ScoreTrendChart data={scoreTrend} />
             )}
           </CardBody>
         </Card>
@@ -274,32 +226,7 @@ export default function AnalyticsPage() {
                 description="Subject performance will appear once you take tests."
               />
             ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart
-                  data={perSubject}
-                  margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#94a3b8"
-                    strokeOpacity={0.25}
-                  />
-                  <XAxis
-                    dataKey="subject"
-                    tick={{ fontSize: 12, fill: "#94a3b8" }}
-                    stroke="#94a3b8"
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: "#94a3b8" }}
-                    stroke="#94a3b8"
-                  />
-                  <Tooltip
-                    contentStyle={chartTooltipStyle}
-                    cursor={{ fill: "#94a3b8", fillOpacity: 0.1 }}
-                  />
-                  <Bar dataKey="score" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <PerSubjectChart data={perSubject} />
             )}
           </CardBody>
         </Card>

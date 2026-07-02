@@ -189,6 +189,77 @@ export const api = {
     request<T>("POST", path, undefined, { ...opts, raw: form }),
 };
 
+// ---- generic SSE streaming helper ----
+// POSTs {..body, stream:true} to `path` and yields text deltas from an SSE
+// stream of `data: {"delta": "..."}` events, plus optional `{"error": "..."}`
+// and a final `{"done": true, ...}`. Pass an AbortSignal to support "Stop".
+// The final done-event object is returned by the generator.
+export async function* streamSSE(
+  path: string,
+  body: object,
+  opts?: { signal?: AbortSignal }
+): AsyncGenerator<string, Record<string, unknown>, unknown> {
+  const token = getAccessToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ...body, stream: true }),
+    signal: opts?.signal,
+  });
+
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => "");
+    let detail = "Failed to start stream.";
+    try {
+      detail = extractDetail(JSON.parse(text), detail);
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, detail);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let doneInfo: Record<string, unknown> = {};
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 1);
+        if (!line || !line.startsWith("data:")) continue;
+        const jsonStr = line.slice(5).trim();
+        if (!jsonStr || jsonStr === "[DONE]") continue;
+        try {
+          const evt = JSON.parse(jsonStr) as Record<string, unknown>;
+          if (evt.done) doneInfo = evt;
+          else if (evt.error) throw new ApiError(500, String(evt.error));
+          else if (typeof evt.delta === "string") yield evt.delta;
+        } catch (e) {
+          if (e instanceof ApiError) throw e;
+          // ignore malformed line
+        }
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      /* ignore */
+    }
+  }
+  return doneInfo;
+}
+
 // ---- streaming chat helper ----
 export interface StreamChatBody {
   chat_id?: string;

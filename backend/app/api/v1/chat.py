@@ -5,8 +5,10 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_active_user
+from app.core.logging import logger
 from app.schemas.chat import CreateChatRequest, RenameChatRequest, SendMessageRequest
 from app.services import chat_service
+from app.services.qwen_client import LLMUnavailable
 from app.services.quota import check_and_consume
 
 router = APIRouter()
@@ -67,10 +69,16 @@ async def send_message(
     if payload.stream:
 
         async def event_generator():
-            async for delta in chat_service.stream_reply(
-                uid, chat_id, payload.message, use_rag=payload.use_rag
-            ):
-                yield f"data: {json.dumps({'delta': delta})}\n\n"
+            try:
+                async for delta in chat_service.stream_reply(
+                    uid, chat_id, payload.message, use_rag=payload.use_rag
+                ):
+                    yield f"data: {json.dumps({'delta': delta})}\n\n"
+            except LLMUnavailable as exc:
+                yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+            except Exception as exc:  # never leave the stream hanging
+                logger.warning(f"Chat stream failed: {exc}")
+                yield f"data: {json.dumps({'error': 'The AI service is temporarily unavailable. Please try again.'})}\n\n"
             yield f"data: {json.dumps({'done': True, 'chat_id': chat_id})}\n\n"
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")

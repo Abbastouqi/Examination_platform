@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     QWEN_MAX_TOKENS: int = 2048
     QWEN_TEMPERATURE: float = 0.4
 
+    # Optional fallback LLM endpoint (used automatically if the primary fails).
+    QWEN_FALLBACK_BASE_URL: str = ""
+    QWEN_FALLBACK_API_KEY: str = ""
+    QWEN_FALLBACK_MODEL: str = ""
+
+    # Circuit breaker: after N consecutive failures, short-circuit LLM calls for
+    # `cooldown` seconds (return a fast 503) instead of hammering a down server.
+    QWEN_CB_THRESHOLD: int = 4
+    QWEN_CB_COOLDOWN: int = 30
+
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
